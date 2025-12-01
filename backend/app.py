@@ -58,7 +58,7 @@ def index_video():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
+    data = request.get_json()
     
     video_id = data.get("video_id")
     question = data.get("message")

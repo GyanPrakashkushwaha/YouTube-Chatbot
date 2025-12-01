@@ -36,6 +36,8 @@ function App() {
 
   const loadChat = async (vId) => {
     const oldHistory = await loadChatHistory(vId)
+    setVideoId(vId)
+    console.log(oldHistory)
     setMessage(oldHistory)
   }
 
