@@ -1,5 +1,5 @@
 from datetime import datetime
-from models import Video, Messages
+from models import Video, Message
 from database import get_db
 
 def save_message_pair(video_id, user_text, bot_text):
@@ -13,13 +13,13 @@ def save_message_pair(video_id, user_text, bot_text):
             db.add(video)
             db.commit()
         
-        user_msg = Messages(
+        user_msg = Message(
             sender = "user",
             text = user_text,
             video_id = video_id,
             timestamp = datetime.utcnow().isoformat()
         )
-        bot_msg = Messages(
+        bot_msg = Message(
             sender = "bot",
             text = user_text,
             video_id = video_id,

@@ -44,7 +44,7 @@ def create_faiss_index_from_docs(docs):
 
 def save_index(vector_store, video_id):
     folder = INDEX_DIR/video_id
-    print(folder)
+    # print(folder)
     folder.mkdir(parents=True, exist_ok=True)
     vector_store.save_local(str(folder))
     return str(folder)

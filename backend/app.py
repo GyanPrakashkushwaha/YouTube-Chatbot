@@ -9,11 +9,13 @@ from rag_backend.rag_utils import (
     load_index,
     augment_query_with_context,
     convert_context_dict_to_text,
-    generate_answer_with_gemini
+    generate_answer_with_gemini,
+    INDEX_DIR
 )
 from database import engine, Base
 import models 
-
+from crud import save_message_pair
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)
@@ -27,23 +29,30 @@ def index_video():
     
     if not video_id:
         return jsonify({"error": "video_id is required"}), 400
-
-    try:
-        transcript = fetch_video_transcript(video_id)
-        docs = chunk_text(transcript)
-        vector_store = create_faiss_index_from_docs(docs)
-        path = save_index(vector_store, video_id)
-        
-        return jsonify({
-            "message": "Index created successfully.",
-            "video_id": video_id,
-            "chunks_created": len(docs),
-            "index_path": path
-        }), 200
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
     
+    folder = INDEX_DIR/video_id
+    if not folder.exists():
+        try:
+            transcript = fetch_video_transcript(video_id)
+            docs = chunk_text(transcript)
+            vector_store = create_faiss_index_from_docs(docs)
+            path = save_index(vector_store, video_id)
+            
+            return jsonify({
+                "message": "Index created successfully.",
+                "video_id": video_id,
+                "chunks_created": len(docs),
+                "index_path": path
+            }), 200
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    return jsonify({
+                "message": "Index Already Created ",
+                "video_id": video_id,
+                "index_path": str(folder)
+            }), 200
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -62,10 +71,9 @@ def chat():
         aug = augment_query_with_context(vector_store, question, k=3)
         context_text = convert_context_dict_to_text(aug["context"])
 
-        # 4️⃣ Generate answer using Gemini (LangChain wrapper)
         final_answer = generate_answer_with_gemini(context_text, question)
-
-        # 5️⃣ Return final RAG answer to frontend
+        save_message_pair(video_id, question, final_answer)
+        
         return jsonify({
             "reply": final_answer
         })

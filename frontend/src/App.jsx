@@ -121,7 +121,7 @@ function App() {
             type="text"
             placeholder="Enter video ID or URL"
             className={`w-full px-3 py-2 rounded bg-[#2a2a2a] text-white border border-gray-700 focus:outline-none`}
-            value={videoId}
+            value={videoId? videoId : setVideoId("f8dhP521DHI")}
             onChange={(e) => setVideoId(e.target.value)}
             />
 
