@@ -14,7 +14,7 @@ from rag_backend.rag_utils import (
 )
 from database import engine, Base
 import models 
-from crud import save_message_pair, get_chat_history
+from crud import save_message_pair, get_chat_history, get_all_videos, save_video_history
 from pathlib import Path
 
 
@@ -38,6 +38,7 @@ def index_video():
             docs = chunk_text(transcript)
             vector_store = create_faiss_index_from_docs(docs)
             path = save_index(vector_store, video_id)
+            save_video_history(video_id)
             
             return jsonify({
                 "message": "Index created successfully.",
@@ -93,5 +94,17 @@ def history(video_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+
+@app.route("/videos", methods = ["GET"])
+def videos_list():
+    try:
+        video_history = get_all_videos()
+        return jsonify({
+            "videos": video_history
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": e}), 500
+
 if __name__ == "__main__":
     app.run(debug=True)

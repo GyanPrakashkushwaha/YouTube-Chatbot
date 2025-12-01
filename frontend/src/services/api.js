@@ -26,14 +26,22 @@ export const sendChat = async (id, message) => {
 };
 
 
-export const loadHistory = async (id) => {
+export const loadChatHistory = async (id) => {
     const res = await fetch(`http://127.0.0.1:5000/history/${id}`)
     const data = await res.json()
     
     return data.history || []
 }
 
-// export const loadHistory_experiemnt = (id) => {
+export const loadVideoHistory = async () => {
+    const res = await fetch(`http://127.0.0.1:5000/videos`)
+    const data = await res.json()
+    
+    return data.videos || []
+}
+
+
+// export const loadChatHistory_experiemnt = (id) => {
 //     fetch(`http://127.0.0.1:5000/history/${id}`)
 //     .then((res) => res.json())
 //     .then((data) => data.history || [])
