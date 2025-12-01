@@ -21,7 +21,7 @@ def save_message_pair(video_id, user_text, bot_text):
         )
         bot_msg = Message(
             sender = "bot",
-            text = user_text,
+            text = bot_text,
             video_id = video_id,
             timestamp = datetime.utcnow().isoformat()
         )
@@ -31,5 +31,21 @@ def save_message_pair(video_id, user_text, bot_text):
         
     except Exception as e: 
         raise e
+    finally:
+        db.close()
+        
+def get_chat_history(video_id):
+    db = get_db()
+    try:
+        messages = db.query(Message).filter(Message.video_id == video_id).order_by(Message.id.asc()).all()
+        print(messages)
+        
+        messages_lst = [{
+            "sender": msg.sender,
+            "text": msg.text,
+            "timestamp": msg.timestamp
+        } for msg in messages]
+        
+        return messages_lst
     finally:
         db.close()

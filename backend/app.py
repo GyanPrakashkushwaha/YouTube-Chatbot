@@ -14,8 +14,9 @@ from rag_backend.rag_utils import (
 )
 from database import engine, Base
 import models 
-from crud import save_message_pair
+from crud import save_message_pair, get_chat_history
 from pathlib import Path
+
 
 app = Flask(__name__)
 CORS(app)
@@ -81,7 +82,16 @@ def chat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
+@app.route("/history/<video_id>", methods = ["POST"])
+def history(video_id):
+    try:
+        history = get_chat_history(video_id)
+        return jsonify({
+            "video_id": video_id,
+            "history": history
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     
 if __name__ == "__main__":
     app.run(debug=True)
