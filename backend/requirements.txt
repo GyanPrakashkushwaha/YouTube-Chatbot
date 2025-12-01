@@ -1,0 +1,12 @@
+flask
+flask-cors
+youtube-transcript-api
+langchain_core
+langchain_text_splitters
+faiss-cpu
+tqdm
+dotenv
+langchain_community
+langchain_google_genai
+sqlalchemy
+aiosqlite
