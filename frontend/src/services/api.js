@@ -24,3 +24,17 @@ export const sendChat = async (id, message) => {
   });
   return res.json();
 };
+
+
+export const loadHistory = async (id) => {
+    const res = await fetch(`http://127.0.0.1:5000/history/${id}`)
+    const data = await res.json()
+    
+    return data.history || []
+}
+
+// export const loadHistory_experiemnt = (id) => {
+//     fetch(`http://127.0.0.1:5000/history/${id}`)
+//     .then((res) => res.json())
+//     .then((data) => data.history || [])
+// }

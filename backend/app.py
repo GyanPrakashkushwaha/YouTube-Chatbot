@@ -82,7 +82,7 @@ def chat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/history/<video_id>", methods = ["POST"])
+@app.route("/history/<video_id>", methods = ["GET"])
 def history(video_id):
     try:
         history = get_chat_history(video_id)

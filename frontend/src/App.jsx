@@ -3,7 +3,7 @@ import Sidebar from "./components/Sidebar";
 import ChatMessages from "./components/ChatMessages";
 import ChatInput from "./components/ChatInput";
 
-import { createIndex, sendChat, extractVideoId } from "./services/api";
+import { createIndex, sendChat, extractVideoId, loadHistory } from "./services/api";
 
 function App() {
   const [messages, setMessage] = useState([]);
@@ -22,24 +22,28 @@ function App() {
 
     if (data.error) alert(data.error);
     else alert("Index created!");
+
+    const oldHistory = await loadHistory(id)
+    setMessage(oldHistory)
   };
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
 
-    setMessage([...messages, { sender: "user", text: input }]);
+    const id = extractVideoId(videoId);
+    
+    const userMessage = { sender: "user", text: input }
+    setMessage((prev) => [...prev, userMessage]);
+
     const temp = input;
     setInput("");
     setIsTyping(true);
 
-    const id = extractVideoId(videoId);
     const data = await sendChat(id, temp);
 
     setIsTyping(false);
-    setMessage((prev) => [
-      ...prev,
-      { sender: "bot", text: data.error ? data.error : data.reply }
-    ]);
+    const botMessage = { sender: "bot", text: data.error ? data.error : data.reply }
+    setMessage((prev) => [...prev, botMessage]);
   };
 
   return (
