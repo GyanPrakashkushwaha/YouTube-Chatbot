@@ -3,6 +3,7 @@ from flask_cors import CORS
 import random
 from rag_backend.rag_utils import (
     fetch_video_transcript,
+    fetch_video_title,
     chunk_text,
     create_faiss_index_from_docs,
     save_index,
@@ -10,12 +11,17 @@ from rag_backend.rag_utils import (
     augment_query_with_context,
     convert_context_dict_to_text,
     generate_answer_with_gemini,
-    INDEX_DIR
-)
+    INDEX_DIR)
+
+
 from database import engine, Base
 import models 
-from crud import save_message_pair, get_chat_history, get_all_videos, save_video_history
+from crud import (save_message_pair, 
+                  get_chat_history, 
+                  get_all_videos, 
+                  save_video_history)
 from pathlib import Path
+
 
 
 app = Flask(__name__)
@@ -35,10 +41,11 @@ def index_video():
     if not folder.exists():
         try:
             transcript = fetch_video_transcript(video_id)
+            title = fetch_video_title(video_id)
             docs = chunk_text(transcript)
             vector_store = create_faiss_index_from_docs(docs)
             path = save_index(vector_store, video_id)
-            save_video_history(video_id)
+            save_video_history(video_id, title)
             
             return jsonify({
                 "message": "Index created successfully.",

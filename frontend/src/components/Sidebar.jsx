@@ -17,7 +17,7 @@ export default function Sidebar({
             className="p-3 rounded-lg bg-[#1a1a1a] border border-[#333] hover:border-blue-500 hover:bg-[#222] transition-all cursor-pointer"
             onClick={() => (loadChat(v.id))}
           >
-            <div className="text-sm text-gray-300">{v.id}</div>
+            <div className="text-sm text-gray-300">{v.title}</div>
           </div>
         ))}
       </div>

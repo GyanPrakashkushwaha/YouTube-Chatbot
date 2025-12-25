@@ -4,9 +4,12 @@ from langchain_core.documents import Document
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
+import requests
+from bs4 import BeautifulSoup
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
+
 
 INDEX_DIR = Path('.indexes')
 INDEX_DIR.mkdir(exist_ok=True)
@@ -22,6 +25,21 @@ def fetch_video_transcript(vid):
     except Exception as e:
         raise RuntimeError(f"Could not fetch transcript: {e}")        
     
+
+def fetch_video_title(vid):
+    VIDEO_ID = 'f8dhP521DHI'
+    url = f"https://www.youtube.com/watch?v={vid}"
+    response = requests.get(url)
+    html_content = response.text
+    soup = BeautifulSoup(html_content, 'html.parser')
+    title_tag = soup.find('meta', property='og:title')
+    
+    if not title_tag:
+        return "Not found"
+
+    return title_tag["content"]
+
+
 def chunk_text(text, chunk_size = 1000, chunk_overlap = 200):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -48,6 +66,7 @@ def save_index(vector_store, video_id):
     folder.mkdir(parents=True, exist_ok=True)
     vector_store.save_local(str(folder))
     return str(folder)
+
     
 def load_index(video_id):
     folder = INDEX_DIR / video_id
@@ -58,8 +77,9 @@ def load_index(video_id):
     vector_store = FAISS.load_local(str(folder), embeddings, allow_dangerous_deserialization= True)
     return vector_store
 
+
 def augment_query_with_context(vector_store, query, k = 3):
-    retriever = vector_store.as_retriever(search_type = "similarity",
+    retriever = vector_store.as_retriever(search_type = "mmr",
                                           search_kwargs = {"k": k})
     
     docs = retriever.invoke(query)
@@ -84,7 +104,7 @@ def generate_answer_with_gemini(context_text, query):
         "Answer in a clear and concise way."
     )
 
-    model = ChatGoogleGenerativeAI(model="models/gemini-2.0-flash", temperature = 0)
+    model = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash-lite", temperature = 0)
 
     # invoke() is the typical LangChain call for chat models
     response = model.invoke(prompt_template)
