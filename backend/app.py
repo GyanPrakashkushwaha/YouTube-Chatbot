@@ -1,17 +1,33 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import random
-from rag_backend.rag_utils import (
+# from rag_backend.rag_utils import (
+#     fetch_video_transcript,
+#     fetch_video_title,
+#     chunk_text,
+#     create_faiss_index_from_docs,
+#     save_index,
+#     load_index,
+#     augment_query_with_context,
+#     convert_context_dict_to_text,
+#     generate_answer_with_gemini,
+#     INDEX_DIR)
+
+from rag_backend.augmentation import (
+    load_index,
+    augment_query_with_context)
+
+from rag_backend.retrieval import (
     fetch_video_transcript,
     fetch_video_title,
     chunk_text,
     create_faiss_index_from_docs,
     save_index,
-    load_index,
-    augment_query_with_context,
-    convert_context_dict_to_text,
-    generate_answer_with_gemini,
     INDEX_DIR)
+
+from rag_backend.generation import (
+    convert_context_dict_to_text,
+    generate_answer_with_gemini)
 
 
 from database import engine, Base
@@ -63,6 +79,7 @@ def index_video():
                 "index_path": str(folder)
             }), 200
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
@@ -101,7 +118,7 @@ def history(video_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-
+    
 @app.route("/videos", methods = ["GET"])
 def videos_list():
     try:

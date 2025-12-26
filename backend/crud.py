@@ -4,7 +4,6 @@ from database import get_db
 
 def save_message_pair(video_id, user_text, bot_text):
     db = get_db()
-    
     try:
         video = db.query(Video).filter(Video.video_id == video_id).first()
         
@@ -29,10 +28,11 @@ def save_message_pair(video_id, user_text, bot_text):
         db.add(bot_msg)
         db.commit()
         
-    except Exception as e: 
+    except Exception as e:
         raise e
     finally:
         db.close()
+        
         
 def get_chat_history(video_id):
     db = get_db()
@@ -49,6 +49,7 @@ def get_chat_history(video_id):
         return messages_lst
     finally:
         db.close()
+        
         
 def get_all_videos():
     db = get_db()

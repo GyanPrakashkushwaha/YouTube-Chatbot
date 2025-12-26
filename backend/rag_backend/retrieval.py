@@ -3,13 +3,11 @@ from langchain_text_splitters.character import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
-
 
 INDEX_DIR = Path('.indexes')
 INDEX_DIR.mkdir(exist_ok=True)
@@ -27,6 +25,7 @@ def fetch_video_transcript(vid):
     
 
 def fetch_video_title(vid):
+    VIDEO_ID = 'f8dhP521DHI'
     url = f"https://www.youtube.com/watch?v={vid}"
     response = requests.get(url)
     html_content = response.text
@@ -35,7 +34,6 @@ def fetch_video_title(vid):
     
     if not title_tag:
         return "Not found"
-
     return title_tag["content"]
 
 
@@ -44,7 +42,6 @@ def chunk_text(text, chunk_size = 1000, chunk_overlap = 200):
         chunk_size=chunk_size,
         chunk_overlap= chunk_overlap
     )
-    
     chunks = splitter.split_text(text)
     docs = [Document(page_content=c) for c in chunks]
     return docs
@@ -65,56 +62,3 @@ def save_index(vector_store, video_id):
     folder.mkdir(parents=True, exist_ok=True)
     vector_store.save_local(str(folder))
     return str(folder)
-
-    
-def load_index(video_id):
-    folder = INDEX_DIR / video_id
-    if not folder.exists():
-        raise FileNotFoundError(f"Index for {video_id} not found.")
-    
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-    vector_store = FAISS.load_local(str(folder), embeddings, allow_dangerous_deserialization= True)
-    return vector_store
-
-
-def augment_query_with_context(vector_store, query, k = 3):
-    retriever = vector_store.as_retriever(search_type = "mmr",
-                                          search_kwargs = {"k": k})
-    
-    docs = retriever.invoke(query)
-    context_dict = {
-        f"chunk_{i+1}": doc.page_content
-        for i, doc in enumerate(docs)
-    }
-    return {
-        "query": query,
-        "context": context_dict
-    }
-    
-    
-def generate_answer_with_gemini(context_text, query):
-    # Build the prompt exactly like notebook
-    prompt_template = (
-        "Use the following video transcript context to answer the question.\n\n"
-        "CONTEXT:\n"
-        f"{context_text}\n\n"
-        "QUESTION:\n"
-        f"{query}\n\n"
-        "Answer in a clear and concise way."
-    )
-
-    model = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash-lite", temperature = 0)
-
-    # invoke() is the typical LangChain call for chat models
-    response = model.invoke(prompt_template)
-
-    # Extract final text
-    return response.content
-
-
-def convert_context_dict_to_text(context_dict):
-    
-    parts = []
-    for key, value in context_dict.items():
-        parts.append(f"[{key}]\n{value}\n")
-    return "\n".join(parts)
