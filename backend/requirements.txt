@@ -12,3 +12,8 @@ sqlalchemy
 aiosqlite
 bs4
 langgraph-checkpoint-sqlite
+tenacity              
+matplotlib           
+networkx             
+pypdf                
+scikit-learn         
