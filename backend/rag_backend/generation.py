@@ -6,12 +6,12 @@ load_dotenv()
 def generate_answer_with_gemini(context_text, query):
     # Build the prompt exactly like notebook
     prompt_template = (
-        "Use the following video transcript context to answer the question.\n\n"
+        "Use the following video context to answer the question.\n\n"
         "CONTEXT:\n"
         f"{context_text}\n\n"
         "QUESTION:\n"
         f"{query}\n\n"
-        "Answer in a clear and concise way."
+        "Answer in a clear and concise way. Answer the questions if asked other than video context."
     )
 
     model = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash-lite", temperature = 0)

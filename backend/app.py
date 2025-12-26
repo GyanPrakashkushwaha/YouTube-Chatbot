@@ -4,6 +4,9 @@ import random
 from database import engine, Base
 import models 
 from pathlib import Path
+from rag_backend.bot_brain import workflow
+from langchain_core.messages import HumanMessage
+import uuid
 
 from rag_backend.augmentation import (
     load_index,
@@ -69,56 +72,57 @@ def index_video():
                 "index_path": str(folder)
             }), 200
 
-
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    
     video_id = data.get("video_id")
     question = data.get("message")
 
-    if not video_id:
-        return jsonify({"error": "video_id is required"}), 400
-    if not question:
-        return jsonify({"error": "message is required"}), 400
+    if not video_id or not question:
+        return jsonify({"error": "video_id and message are required"}), 400
 
     try:
-        vector_store = load_index(video_id)
-        aug = augment_query_with_context(vector_store, question, k=3)
-        context_text = convert_context_dict_to_text(aug["context"])
+        # 1. Use video_id as thread_id
+        config = {
+            "configurable": {
+                "thread_id": video_id,
+                "video_id": video_id # Pass this if your retrieval node needs it
+            }
+        }
 
-        final_answer = generate_answer_with_gemini(context_text, question)
-        save_message_pair(video_id, question, final_answer)
+        # 2. Invoke the graph
+        inputs = {"messages": [HumanMessage(content=question)]}
+        result = workflow.invoke(inputs, config=config)
         
-        return jsonify({
-            "reply": final_answer
-        })
+        # 3. Get the answer
+        final_answer = result["messages"][-1].content
+        
+        return jsonify({"reply": final_answer})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/history/<video_id>", methods = ["GET"])
+@app.route("/history/<video_id>", methods=["GET"])
 def history(video_id):
     try:
-        history = get_chat_history(video_id)
+        # Fetch history directly from LangGraph state
+        history_data = get_chat_history(video_id)
         return jsonify({
             "video_id": video_id,
-            "history": history
+            "history": history_data
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-    
-@app.route("/videos", methods = ["GET"])
+@app.route("/videos", methods=["GET"])
 def videos_list():
     try:
-        video_history = get_all_videos()
-        return jsonify({
-            "videos": video_history
-        }), 200
+        # Fetch list from LangGraph checkpoints
+        video_list = get_all_videos()
+        return jsonify({"videos": video_list}), 200
         
     except Exception as e:
-        return jsonify({"error": e}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
