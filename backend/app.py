@@ -32,7 +32,6 @@ from crud import (
 
 
 
-
 app = Flask(__name__)
 CORS(app)
 Base.metadata.create_all(bind=engine)
@@ -71,6 +70,7 @@ def index_video():
                 "video_id": video_id,
                 "index_path": str(folder)
             }), 200
+    
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -86,7 +86,7 @@ def chat():
         config = {
             "configurable": {
                 "thread_id": video_id,
-                "video_id": video_id # Pass this if your retrieval node needs it
+                "video_id": video_id # Pass this if retrieval node needs it
             }
         }
 
@@ -96,6 +96,8 @@ def chat():
         
         # 3. Get the answer
         final_answer = result["messages"][-1].content
+        
+        save_message_pair(video_id, question, final_answer)
         
         return jsonify({"reply": final_answer})
 
