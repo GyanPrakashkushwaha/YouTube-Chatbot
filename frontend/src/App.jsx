@@ -37,8 +37,12 @@ function App() {
   const loadChat = async (vId) => {
     const oldHistory = await loadChatHistory(vId)
     setVideoId(vId)
-    console.log(oldHistory)
     setMessage(oldHistory)
+  }
+
+  const resetChat = () => {
+    setVideoId("")
+    setMessage([])
   }
 
   const handleCreateIndex = async () => {
@@ -76,7 +80,7 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-screen flex bg-black">
+    <div className="h-screen w-screen flex bg-gray-900 text-gray-100 overflow-hidden font-sans">
       <Sidebar
         videoId={videoId}
         setVideoId={setVideoId}
@@ -84,9 +88,10 @@ function App() {
         handleCreateIndex={handleCreateIndex}
         videoList={videoList}
         loadChat={loadChat}
+        resetChat={resetChat}
       />
 
-      <div className="flex-1 flex flex-col bg-[#1e1e1e]">
+      <div className="flex-1 flex flex-col bg-gray-800 relative shadow-2xl z-10">
         <ChatMessages messages={messages} isTyping={isTyping} />
         <ChatInput input={input} setInput={setInput} onSend={handleSendMessage} />
       </div>

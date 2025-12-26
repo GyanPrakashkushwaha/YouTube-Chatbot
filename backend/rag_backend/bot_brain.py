@@ -91,7 +91,6 @@ checkpointer = SqliteSaver(conn=conn)
 
 workflow = builder.compile(checkpointer=checkpointer)
 
-# --- NEW HELPER FUNCTIONS ---
 
 def get_chat_history(video_id: str):
     """
@@ -116,21 +115,8 @@ def get_chat_history(video_id: str):
     return formatted_history
 
 def get_all_videos():
-    """
-    Lists all unique video IDs (thread_ids) present in the storage.
-    """
-    # checkpointer.list(None) returns an iterator of all checkpoints
-    # We iterate through them to find unique thread_ids
     unique_video_ids = set()
-    
-    # Note: list(None) lists all checkpoints. 
-    # For a large production app, you'd want a more optimized SQL query,
-    # but for a local app, this works fine.
     for checkpoint in checkpointer.list(None):
         thread_id = checkpoint.config["configurable"]["thread_id"]
         unique_video_ids.add(thread_id)
-        
-    # Format for frontend. 
-    # Note: We only have the ID here. If you need titles, 
-    # we'd need to store them in the state or metadata previously.
     return [{"video_id": vid, "title": f"Video {vid}"} for vid in unique_video_ids]
