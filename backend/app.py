@@ -1,13 +1,20 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from database import engine, Base
 import models
 from pathlib import Path
-from rag_backend.bot_brain import workflow
+from rag_backend.bot_brain import workflow, ai_only_stream, get_chat_history, get_all_videos
 from langchain_core.messages import HumanMessage
 import uuid
 import uvicorn
 from pydantic import BaseModel
+from crud import save_video_history
+import rag_backend.bot_brain as bot_brain
+
+
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from rag_backend.augmentation import (
     load_index,
@@ -25,11 +32,18 @@ from rag_backend.generation import (
     convert_context_dict_to_text,
     generate_answer_with_gemini)
 
-from crud import (
-    get_all_videos, 
-    save_video_history)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI): # The connection closes automatically when the app stops
+    # Initialization
+    async with AsyncSqliteSaver.from_conn_string("memory.db") as saver:
+        # Injection of checkpointer and workflow.
+        bot_brain.checkpointer = saver
+        bot_brain.workflow = bot_brain.builder.compile(checkpointer = saver)
+        yield
+        
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,6 +99,9 @@ async def index_video(request: IndexRequest):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
+    """
+    Standard non-streaming chat endpoint.
+    """
     video_id = request.video_id
     question = request.query
 
@@ -98,7 +115,10 @@ async def chat(request: ChatRequest):
         }
         # 2. Invoke the graph
         inputs = {"messages": [HumanMessage(content=question)]}
-        result = workflow.invoke(inputs, config=config)
+        if bot_brain.workflow is None:
+            raise HTTPException(status_code=500, detail="Workflow not initialized")
+        
+        result = await bot_brain.workflow.ainvoke(inputs, config=config)
         
         # 3. Get the answer
         final_answer = result["messages"][-1].content
@@ -108,21 +128,33 @@ async def chat(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming chat endpoint using Server-Sent Events (SSE).
+    """
+    video_id = request.video_id
+    question = request.query
+    
+    async def event_stream():
+        try:
+            async for token in ai_only_stream(video_id, question):
+                yield f"data: {token}\n\n"
+            yield "data: [DONE]"
+        except Exception as e:
+            yield f"data: Error: {str(e)}\n\n"
 
-@app.get("/history/<video_id>")
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.get("/history/{video_id}")
 async def history(video_id: str):
     try:
         # Fetch history directly from LangGraph state
-        state = workflow.get_state(config={
-            "configurable": {
-                "thread_id": video_id
-            }
-        })
+        state = get_chat_history(video_id)
         
-        history_data = state.values.get("messages", [])
         return {
             "video_id": video_id,
-            "history": history_data
+            "history": state
         }
         
     except Exception as e:
@@ -133,7 +165,7 @@ async def history(video_id: str):
 async def videos_list():
     try:
         # Fetch list from LangGraph checkpoints
-        video_list = get_all_videos()
+        video_list = await get_all_videos()
         return {
             "videos": video_list
             }

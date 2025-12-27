@@ -3,9 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph.message import add_messages
 from langgraph.graph import START, END, StateGraph
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.runnables import RunnableConfig
-import sqlite3
 import os
 
 # Import your existing RAG tools
@@ -22,7 +20,7 @@ model = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash-lite", temperature
 
 # --- Define Nodes ---
 
-def retrieve_node(state: BotState, config: RunnableConfig):
+async def retrieve_node(state: BotState, config: RunnableConfig):
     """
     Retrieves relevant context based on the user's last message.
     """
@@ -45,17 +43,13 @@ def retrieve_node(state: BotState, config: RunnableConfig):
     return {"context": context_text}
 
 
-def generate_node(state: BotState):
+async def generate_node(state: BotState):
     """
     Generates an answer using the retrieved context and history.
     """
     context = state["context"]
     messages = state["messages"]
-    
-    # Construct a prompt that includes context + chat history
-    # We can pass the messages directly to the model, but we need to inject the context.
-    # A simple system message or prepended context works well.
-    
+
     system_instruction = f"""Use the following video context to answer the question.
     
     CONTEXT:
@@ -67,7 +61,7 @@ def generate_node(state: BotState):
     # Create a new list of messages for the model call: System Instruction + Chat History
     prompt_messages = [HumanMessage(content=system_instruction)] + messages
     
-    response = model.invoke(prompt_messages)
+    response = await model.ainvoke(prompt_messages)
     
     return {"messages": [response]}
 
@@ -83,22 +77,42 @@ builder.add_edge(START, "retrieve")
 builder.add_edge("retrieve", "generate")
 builder.add_edge("generate", END)
 
-# --- Persistence ---
+# --- Globals (Initialized in app.py) ---
+workflow = None
+checkpointer = None
 
-# Ensure the database exists or is created
-db_path = "memory.db"
-conn = sqlite3.connect(database="memory.db", check_same_thread=False)
-checkpointer = SqliteSaver(conn=conn)
+async def ai_only_stream(video_id: str, query: str):
+    """
+    Generator that yields tokens from the LLM response.
+    """
+    config = {
+        "configurable": {
+            "thread_id": video_id,
+            "video_id": video_id
+        }
+    }
+    inputs = {
+        "messages": [HumanMessage(content=query)]
+    }
+    async for event in workflow.astream_events(inputs, config=config, version="v1"):
+            # We filter for the specific event where the LLM emits a token
+            if event["event"] == "on_chat_model_stream":
+                # Get the chunk data
+                chunk = event["data"]["chunk"]
+                if chunk.content:
+                    # Yield just the text content (token)
+                    yield chunk.content
+                    
 
-workflow = builder.compile(checkpointer=checkpointer)
-
-def get_chat_history(video_id: str):
+async def get_chat_history(video_id: str):
     """
     Fetches the message history for a specific video (thread).
     """
+    if workflow is None:
+        return []
     config = {"configurable": {"thread_id": video_id}}
     # get_state returns a StateSnapshot
-    current_state = workflow.get_state(config)
+    current_state = await workflow.aget_state(config)
     
     # The 'messages' key holds the list of BaseMessages
     messages = current_state.values.get("messages", [])
@@ -109,14 +123,17 @@ def get_chat_history(video_id: str):
         role = "user" if isinstance(msg, HumanMessage) else "model"
         formatted_history.append({
             "role": role,
-            "text": msg.content # Ensure this matches frontend key (e.g., 'text' or 'content')
+            "text": msg.content
         })
         
     return formatted_history
 
-def get_all_videos():
+async def get_all_videos():
+    """
+    Async function to fetch all videos from the checkpointer.
+    """
     unique_video_ids = set()
-    for checkpoint in checkpointer.list(None):
+    async for checkpoint in checkpointer.alist(None):
         thread_id = checkpoint.config["configurable"]["thread_id"]
         unique_video_ids.add(thread_id)
     return [{"video_id": vid, "title": f"Video {vid}"} for vid in unique_video_ids]
