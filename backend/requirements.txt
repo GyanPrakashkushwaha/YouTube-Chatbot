@@ -12,3 +12,7 @@ sqlalchemy
 aiosqlite
 bs4
 langgraph-checkpoint-sqlite
+
+fastapi
+uvicorn
+pydantic

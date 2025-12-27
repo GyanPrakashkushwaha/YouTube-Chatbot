@@ -1,18 +1,19 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import random
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-import models 
+import models
 from pathlib import Path
 from rag_backend.bot_brain import workflow
 from langchain_core.messages import HumanMessage
 import uuid
+import uvicorn
+from pydantic import BaseModel
 
 from rag_backend.augmentation import (
     load_index,
     augment_query_with_context)
 
-from rag_backend.retrieval import(
+from rag_backend.retrieval import (
     fetch_video_transcript,
     fetch_video_title,
     chunk_text,
@@ -25,22 +26,32 @@ from rag_backend.generation import (
     generate_answer_with_gemini)
 
 from crud import (
-    save_message_pair, 
-    get_chat_history, 
     get_all_videos, 
     save_video_history)
 
+app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
-app = Flask(__name__)
-CORS(app)
 Base.metadata.create_all(bind=engine)
 
+# Request Bodies
+class IndexRequest(BaseModel):
+    video_id: str
 
-@app.route("/index", methods = ["POST"])
-def index_video():
-    data = request.get_json()
-    video_id = data.get("video_id")
+class ChatRequest(BaseModel):
+    video_id: str
+    query : str
+
+@app.post("/index")
+async def index_video(request: IndexRequest):
+    video_id = request.video_id
     
     if not video_id:
         return jsonify({"error": "video_id is required"}), 400
@@ -55,41 +66,36 @@ def index_video():
             path = save_index(vector_store, video_id)
             save_video_history(video_id, title)
             
-            return jsonify({
+            return {
                 "message": "Index created successfully.",
                 "video_id": video_id,
                 "chunks_created": len(docs),
                 "index_path": path
-            }), 200
+            }
             
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            raise HTTPException(status_code=500, detail=str(e))
     
-    return jsonify({
-                "message": "Index Already Created ",
-                "video_id": video_id,
-                "index_path": str(folder)
-            }), 200
+    return {
+            "message": "Index Already Created ",
+            "video_id": video_id,
+            "index_path": str(folder)
+            }
     
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    data = request.get_json()
-    video_id = data.get("video_id")
-    question = data.get("message")
-
-    if not video_id or not question:
-        return jsonify({"error": "video_id and message are required"}), 400
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    video_id = request.video_id
+    question = request.query
 
     try:
         # 1. Use video_id as thread_id
         config = {
             "configurable": {
                 "thread_id": video_id,
-                "video_id": video_id # Pass this if retrieval node needs it
+                "video_id": video_id 
             }
         }
-
         # 2. Invoke the graph
         inputs = {"messages": [HumanMessage(content=question)]}
         result = workflow.invoke(inputs, config=config)
@@ -97,34 +103,43 @@ def chat():
         # 3. Get the answer
         final_answer = result["messages"][-1].content
         
-        save_message_pair(video_id, question, final_answer)
-        
-        return jsonify({"reply": final_answer})
+        return {"reply": final_answer}
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route("/history/<video_id>", methods=["GET"])
-def history(video_id):
+
+@app.get("/history/<video_id>")
+async def history(video_id: str):
     try:
         # Fetch history directly from LangGraph state
-        history_data = get_chat_history(video_id)
-        return jsonify({
+        state = workflow.get_state(config={
+            "configurable": {
+                "thread_id": video_id
+            }
+        })
+        
+        history_data = state.values.get("messages", [])
+        return {
             "video_id": video_id,
             "history": history_data
-        })
+        }
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
     
-@app.route("/videos", methods=["GET"])
-def videos_list():
+    
+@app.get("/videos")
+async def videos_list():
     try:
         # Fetch list from LangGraph checkpoints
         video_list = get_all_videos()
-        return jsonify({"videos": video_list}), 200
+        return {
+            "videos": video_list
+            }
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    uvicorn.run(app, host="127.0.0.1", port=5000)

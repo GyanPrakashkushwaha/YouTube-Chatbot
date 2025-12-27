@@ -1,4 +1,7 @@
 # Byte-compiled / optimized / DLL files
+
+# Look At file 
+backend/best-practices
 __pycache__/
 *.py[codz]
 *$py.class

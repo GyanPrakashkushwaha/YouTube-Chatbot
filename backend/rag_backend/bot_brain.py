@@ -35,7 +35,7 @@ def retrieve_node(state: BotState, config: RunnableConfig):
     last_message = state["messages"][-1].content
 
     # 3. Load index and retrieve (using your existing functions)
-    # Note: We are reusing your logic from augmentation.py
+    # Note: We are reusing the logic from augmentation.py
     vector_store = load_index(video_id) 
     aug_data = augment_query_with_context(vector_store, last_message)
     
@@ -43,6 +43,7 @@ def retrieve_node(state: BotState, config: RunnableConfig):
     context_text = convert_context_dict_to_text(aug_data["context"])
     
     return {"context": context_text}
+
 
 def generate_node(state: BotState):
     """
@@ -90,7 +91,6 @@ conn = sqlite3.connect(database="memory.db", check_same_thread=False)
 checkpointer = SqliteSaver(conn=conn)
 
 workflow = builder.compile(checkpointer=checkpointer)
-
 
 def get_chat_history(video_id: str):
     """
